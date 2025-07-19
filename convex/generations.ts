@@ -1,8 +1,11 @@
+"use node";
+
 import { query, mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { validateEnvironment } from "./utils";
 import { FalApiError, FileUploadError } from "./errors";
+import { fal } from "@fal-ai/client";
 
 export const list = query({
   args: {},
@@ -106,6 +109,11 @@ export const trainModel = action({
   handler: async (ctx, args) => {
     const env = validateEnvironment();
     
+    // Configure Fal AI client
+    fal.config({
+      credentials: env.FAL_KEY
+    });
+    
     console.log(`🚀 Starting optimized model training for: ${args.modelName}`);
     console.log(`📝 Trigger word: ${args.triggerWord}`);
     console.log(`📦 ZIP Storage ID: ${args.zipStorageId}`);
@@ -120,64 +128,63 @@ export const trainModel = action({
       
       console.log(`✅ ZIP file retrieved: ${zipBlob.size} bytes`);
 
-      // Step 2: Convert to format suitable for Fal AI
-      console.log(`🔄 Preparing ZIP file for Fal AI...`);
+      // Step 2: Create File object for Fal AI client
+      console.log(`🔄 Preparing ZIP file for Fal AI upload...`);
       const zipArrayBuffer = await zipBlob.arrayBuffer();
       
-      // Create a File object that Fal AI client can handle
+      // Create a proper File object for Fal AI client
       const zipFile = new File([zipArrayBuffer], `training_${args.modelName}_${Date.now()}.zip`, {
         type: 'application/zip'
       });
       
       console.log(`📊 ZIP file prepared: ${zipFile.name} (${zipFile.size} bytes)`);
 
-      // Step 3: Use Fal AI's official approach - direct API call with FormData
-      console.log(`☁️ Uploading ZIP to Fal AI and starting training...`);
+      // Step 3: Upload ZIP to Fal AI storage using their official client
+      console.log(`☁️ Uploading ZIP to Fal AI storage...`);
+      const falStorageUrl = await fal.storage.upload(zipFile);
       
-      // Create FormData for multipart upload (if Fal AI supports it)
-      // Otherwise, we'll use the direct API approach
-      const trainingResponse = await fetch("https://fal.run/fal-ai/flux-lora-fast-training", {
-        method: "POST",
-        headers: {
-          "Authorization": `Key ${env.FAL_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          images_data_url: `data:application/zip;base64,${await convertToBase64(zipArrayBuffer)}`,
+      console.log(`✅ ZIP uploaded to Fal AI storage: ${falStorageUrl}`);
+
+      // Step 4: Start training using the uploaded file URL
+      console.log(`🎓 Starting model training with Fal AI client...`);
+      
+      const trainingResult = await fal.subscribe("fal-ai/flux-lora-fast-training", {
+        input: {
+          images_data_url: falStorageUrl,
           trigger_word: args.triggerWord,
           create_masks: true,
           is_style: false,
           steps: 1000,
           iter_multiplier: 1.0
-        }),
+        },
+        logs: true,
+        onQueueUpdate: (update) => {
+          if (update.status === "IN_PROGRESS") {
+            console.log(`📊 Training progress: ${update.status}`);
+            update.logs?.map((log) => log.message).forEach((msg) => {
+              console.log(`🔄 Training log: ${msg}`);
+            });
+          }
+        },
       });
 
-      console.log(`📡 Fal AI training response status: ${trainingResponse.status}`);
-
-      if (!trainingResponse.ok) {
-        const errorText = await trainingResponse.text();
-        console.error(`❌ Fal AI training failed: ${trainingResponse.statusText} - ${errorText}`);
-        throw new FalApiError(`Training failed: ${trainingResponse.statusText} - ${errorText}`, trainingResponse.status);
-      }
-
-      const trainingResult = await trainingResponse.json();
       console.log(`🎉 Training completed successfully!`);
-      console.log(`📄 Result:`, trainingResult);
+      console.log(`📄 Result:`, trainingResult.data);
 
-      // Step 4: Save trained model to database
+      // Step 5: Save trained model to database
       await ctx.runMutation(api.modelWeights.createFromTraining, {
         name: args.modelName,
         tok: args.triggerWord,
-        modelUrl: trainingResult.diffusers_lora_file.url,
-        configUrl: trainingResult.config_file?.url,
+        modelUrl: trainingResult.data.diffusers_lora_file.url,
+        configUrl: trainingResult.data.config_file?.url,
       });
 
       console.log(`💾 Model saved to database successfully`);
 
       return {
         success: true,
-        modelUrl: trainingResult.diffusers_lora_file.url,
-        configUrl: trainingResult.config_file?.url,
+        modelUrl: trainingResult.data.diffusers_lora_file.url,
+        configUrl: trainingResult.data.config_file?.url,
         message: `Model "${args.modelName}" trained successfully!`
       };
 
@@ -193,21 +200,6 @@ export const trainModel = action({
   },
 });
 
-// Helper function for base64 conversion (optimized)
-async function convertToBase64(arrayBuffer: ArrayBuffer): Promise<string> {
-  const uint8Array = new Uint8Array(arrayBuffer);
-  let binaryString = '';
-  
-  // Process in chunks to avoid stack overflow on large files
-  const chunkSize = 8192;
-  for (let i = 0; i < uint8Array.length; i += chunkSize) {
-    const chunk = uint8Array.slice(i, i + chunkSize);
-    binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-  }
-  
-  return btoa(binaryString);
-}
-
 // Test function to verify training setup
 export const testTraining = action({
   args: {
@@ -217,37 +209,44 @@ export const testTraining = action({
   handler: async (ctx, args) => {
     const env = validateEnvironment();
     
-    console.log(`🧪 Testing training setup...`);
+    // Configure Fal AI client
+    fal.config({
+      credentials: env.FAL_KEY
+    });
+    
+    console.log(`🧪 Testing training setup with Fal AI client...`);
     
     try {
-      // Test with a simple public image URL
-      const testResponse = await fetch("https://fal.run/fal-ai/flux-lora-fast-training", {
-        method: "POST",
-        headers: {
-          "Authorization": `Key ${env.FAL_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      // Test with a simple public image URL using the official client
+      const testResult = await fal.subscribe("fal-ai/flux-lora-fast-training", {
+        input: {
           images_data_url: "https://picsum.photos/512/512?random=1",
           trigger_word: args.triggerWord,
           create_masks: true,
           is_style: false,
           steps: 10, // Minimal steps for testing
           iter_multiplier: 1.0
-        }),
+        },
+        logs: true,
+        onQueueUpdate: (update) => {
+          console.log(`🧪 Test progress: ${update.status}`);
+        },
       });
 
-      if (testResponse.ok) {
-        console.log(`✅ Training API is accessible and working`);
-        return { success: true, message: "Training API test passed" };
-      } else {
-        const errorText = await testResponse.text();
-        console.error(`❌ Training API test failed: ${testResponse.status} - ${errorText}`);
-        return { success: false, message: `API test failed: ${testResponse.statusText}` };
-      }
+      console.log(`✅ Training API test passed with Fal AI client!`);
+      console.log(`📄 Test result:`, testResult.data);
+      
+      return { 
+        success: true, 
+        message: "Training API test passed with Fal AI client",
+        result: testResult.data
+      };
     } catch (error) {
       console.error(`❌ Training test error:`, error);
-      return { success: false, message: `Test error: ${error instanceof Error ? error.message : 'Unknown'}` };
+      return { 
+        success: false, 
+        message: `Test error: ${error instanceof Error ? error.message : 'Unknown'}` 
+      };
     }
   },
 });
