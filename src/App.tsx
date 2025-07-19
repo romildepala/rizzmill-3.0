@@ -16,16 +16,7 @@ const MODELS = [
 
 type ModelId = typeof MODELS[number]["id"];
 
-// URL routing helper
-function getUrlParams() {
-  const urlParams = new URLSearchParams(window.location.search);
-  return {
-    verifyToken: urlParams.get('token'),
-    resetToken: urlParams.get('token'),
-    isVerifyEmail: window.location.pathname === '/verify-email',
-    isResetPassword: window.location.pathname === '/reset-password',
-  };
-}
+
 
 function AuthenticatedApp() {
   const [selectedModel, setSelectedModel] = useState<ModelId>(MODELS[0].id);
@@ -575,46 +566,26 @@ function SignInPage() {
 }
 
 export default function App() {
-  const urlParams = getUrlParams();
+  const { isLoaded, isSignedIn } = useUser();
   
-  // Handle email verification page
-  if (urlParams.isVerifyEmail && urlParams.verifyToken) {
+  if (!isLoaded) {
     return (
-      <ErrorBoundary>
-        <EmailVerificationPage 
-          token={urlParams.verifyToken} 
-          onSuccess={() => {
-            window.location.href = '/';
-          }} 
-        />
-        <Toaster />
-      </ErrorBoundary>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
     );
   }
-  
-  // Handle password reset page
-  if (urlParams.isResetPassword && urlParams.resetToken) {
-    return (
-      <ErrorBoundary>
-        <ResetPasswordPage 
-          token={urlParams.resetToken} 
-          onSuccess={() => {
-            window.location.href = '/';
-          }} 
-        />
-        <Toaster />
-      </ErrorBoundary>
-    );
-  }
-  
+
   return (
     <ErrorBoundary>
-      <Authenticated>
+      {isSignedIn ? (
         <AuthenticatedApp />
-      </Authenticated>
-      <Unauthenticated>
+      ) : (
         <SignInPage />
-      </Unauthenticated>
+      )}
       <Toaster />
     </ErrorBoundary>
   );

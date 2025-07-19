@@ -1,6 +1,5 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const list = query({
   args: {},
@@ -21,8 +20,9 @@ export const createFromTraining = mutation({
     configUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    const user = userId ? await ctx.db.get(userId) : null;
+    // Note: With Clerk, user management is handled by Clerk
+    // We'll store the model weights without user association for now
+    // In a production app, you'd integrate Clerk user ID here
     
     return await ctx.db.insert("modelWeights", {
       name: args.name,
@@ -30,7 +30,7 @@ export const createFromTraining = mutation({
       modelUrl: args.modelUrl,
       configUrl: args.configUrl,
       isPublic: true,
-      userEmail: user?.email,
+      userEmail: undefined, // Will be set when we integrate Clerk user ID
       createdTimestamp: Date.now(),
     });
   },

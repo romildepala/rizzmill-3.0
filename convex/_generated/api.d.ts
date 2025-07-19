@@ -13,14 +13,12 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as emailVerification from "../emailVerification.js";
 import type * as errors from "../errors.js";
 import type * as fileValidation from "../fileValidation.js";
 import type * as generations from "../generations.js";
 import type * as http from "../http.js";
 import type * as logging from "../logging.js";
 import type * as modelWeights from "../modelWeights.js";
-import type * as passwordReset from "../passwordReset.js";
 import type * as router from "../router.js";
 import type * as testTraining from "../testTraining.js";
 import type * as training from "../training.js";
@@ -35,14 +33,12 @@ import type * as utils from "../utils.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  emailVerification: typeof emailVerification;
   errors: typeof errors;
   fileValidation: typeof fileValidation;
   generations: typeof generations;
   http: typeof http;
   logging: typeof logging;
   modelWeights: typeof modelWeights;
-  passwordReset: typeof passwordReset;
   router: typeof router;
   testTraining: typeof testTraining;
   training: typeof training;
