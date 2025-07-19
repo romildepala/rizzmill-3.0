@@ -11,6 +11,59 @@ const MODELS = [
 
 type ModelId = typeof MODELS[number]["id"];
 
+interface ImageModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  imageUrl: string;
+  prompt: string;
+}
+
+function ImageModal({ isOpen, onClose, imageUrl, prompt }: ImageModalProps) {
+  if (!isOpen) return null;
+
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `ai-generated-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Image downloaded successfully!");
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold text-gray-900">Generated Image</h3>
+          <div className="flex space-x-2">
+            <button
+              onClick={handleDownload}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Download
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+        <div className="p-4">
+          <img 
+            src={imageUrl} 
+            alt={prompt} 
+            className="w-full h-auto max-h-[70vh] object-contain rounded"
+          />
+          <p className="mt-4 text-sm text-gray-600">{prompt}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AuthenticatedApp() {
   const [selectedModel, setSelectedModel] = useState<ModelId>(MODELS[0].id);
   const [selectedWeight, setSelectedWeight] = useState("");
@@ -24,6 +77,10 @@ function AuthenticatedApp() {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   const [trainingProgress, setTrainingProgress] = useState(0);
+
+  // Image modal states
+  const [selectedImage, setSelectedImage] = useState<{ url: string; prompt: string } | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const generations = useQuery(api.generations.list) || [];
   const modelWeights = useQuery(api.modelWeights.list) || [];
@@ -77,6 +134,21 @@ function AuthenticatedApp() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleImageClick = (imageUrl: string, prompt: string) => {
+    setSelectedImage({ url: imageUrl, prompt });
+    setIsModalOpen(true);
+  };
+
+  const handleDownload = (imageUrl: string, prompt: string) => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `ai-generated-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Image downloaded successfully!");
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -364,8 +436,28 @@ function AuthenticatedApp() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {generations.map((generation) => (
                     <div key={generation._id} className="border rounded-lg p-4">
-                      <img src={generation.imageUrl} alt={generation.prompt} className="w-full h-48 object-cover rounded" />
-                      <p className="mt-2 text-sm text-gray-600">{generation.prompt}</p>
+                      <div className="relative group">
+                        <img 
+                          src={generation.imageUrl} 
+                          alt={generation.prompt} 
+                          className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handleImageClick(generation.imageUrl, generation.prompt)}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-white text-sm font-medium">
+                            Click to view full size
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex justify-between items-start">
+                        <p className="text-sm text-gray-600 flex-1 mr-2">{generation.prompt}</p>
+                        <button
+                          onClick={() => handleDownload(generation.imageUrl, generation.prompt)}
+                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors whitespace-nowrap"
+                        >
+                          Download
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -458,6 +550,19 @@ function AuthenticatedApp() {
           </div>
         )}
       </div>
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <ImageModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedImage(null);
+          }}
+          imageUrl={selectedImage.url}
+          prompt={selectedImage.prompt}
+        />
+      )}
     </div>
   );
 }
