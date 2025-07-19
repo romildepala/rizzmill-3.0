@@ -436,12 +436,14 @@ function AuthenticatedApp() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {generations.map((generation) => (
                     <div key={generation._id} className="border rounded-lg p-4">
-                      <div className="relative group">
+                      <div 
+                        className="relative group cursor-pointer"
+                        onClick={() => handleImageClick(generation.imageUrl, generation.prompt)}
+                      >
                         <img 
                           src={generation.imageUrl} 
                           alt={generation.prompt} 
-                          className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => handleImageClick(generation.imageUrl, generation.prompt)}
+                          className="w-full h-48 object-cover rounded hover:opacity-90 transition-opacity"
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-white text-sm font-medium">
@@ -452,7 +454,10 @@ function AuthenticatedApp() {
                       <div className="mt-2 flex justify-between items-start">
                         <p className="text-sm text-gray-600 flex-1 mr-2">{generation.prompt}</p>
                         <button
-                          onClick={() => handleDownload(generation.imageUrl, generation.prompt)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(generation.imageUrl, generation.prompt);
+                          }}
                           className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors whitespace-nowrap"
                         >
                           Download
