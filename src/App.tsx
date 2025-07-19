@@ -44,7 +44,7 @@ function AuthenticatedApp() {
   const generateUploadUrl = useMutation(api.generations.generateUploadUrl);
   const seedWeights = useMutation(api.modelWeights.seedWeights);
   const user = useQuery(api.auth.loggedInUser);
-  const testZipCreation = useAction(api.generations.testZipContent);
+  const testTraining = useAction(api.generations.testTraining);
 
   // Set default weight when weights load
   useEffect(() => {
@@ -168,163 +168,85 @@ function AuthenticatedApp() {
     updateProgress({
       isUploading: true,
       uploadProgress: 0,
-      currentStep: 'Preparing files...',
+      currentStep: 'Preparing training data...',
     });
 
     setIsTraining(true);
-    console.log(`🚀 Starting model training process...`);
+    console.log(`🚀 Starting clean model training process...`);
     console.log(`📝 Model Name: ${modelName.trim()}`);
     console.log(`🎯 Trigger Word: ${triggerWord.trim()}`);
     console.log(`🖼️ Number of images: ${selectedImages.length}`);
 
     try {
-      // Import JSZip for ZIP creation (more standard than fflate)
+      // Step 1: Create ZIP file using JSZip (cleaner approach)
       const JSZip = (await import('jszip')).default;
       console.log(`📦 JSZip library loaded successfully`);
       
       updateProgress({
-        uploadProgress: 25,
+        uploadProgress: 20,
         currentStep: 'Processing images...',
       });
       
-      // Prepare files for ZIP with timestamp-based renaming
       const zip = new JSZip();
       const timestamp = Date.now();
       
-      console.log(`🔄 Processing images for ZIP archive...`);
+      console.log(`🔄 Adding ${selectedImages.length} images to ZIP...`);
       
       for (let i = 0; i < selectedImages.length; i++) {
         const file = selectedImages[i];
-        const originalName = file.name.split('.')[0]; // Remove extension
         const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `image_${i + 1}.${extension}`;
         
-        // Ensure we have a valid image extension
-        const validExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-        const finalExtension = validExtensions.includes(extension) ? extension : 'jpg';
-        
-        // Rename with timestamp: originalName_timestamp_index.extension
-        const newFileName = `${originalName}_${timestamp}_${i + 1}.${finalExtension}`;
-        
-        console.log(`  📄 Processing: ${file.name} → ${newFileName} (${file.size} bytes, ${file.type})`);
-        
-        // Add file to JSZip
-        zip.file(newFileName, file);
-        
-        // Add caption file if provided (optional enhancement)
-        const captionKey = `${originalName}_${timestamp}_${i + 1}`;
-        const caption = imageCaptions[captionKey];
-        if (caption && caption.trim()) {
-          const captionFileName = `${originalName}_${timestamp}_${i + 1}.txt`;
-          const captionText = `${triggerWord.trim()}, ${caption.trim()}`;
-          zip.file(captionFileName, captionText);
-          console.log(`  📝 Added caption: ${captionFileName} → "${captionText}"`);
-        }
+        zip.file(fileName, file);
+        console.log(`  ✅ Added: ${fileName} (${file.size} bytes)`);
       }
       
       updateProgress({
-        uploadProgress: 50,
+        uploadProgress: 40,
         currentStep: 'Creating ZIP archive...',
       });
       
-      console.log(`📋 ZIP will contain ${Object.keys(zip.files).length} files:`);
-      Object.keys(zip.files).forEach((fileName, index) => {
-        console.log(`  ${index + 1}. ${fileName}`);
-      });
-
-      // Create ZIP using JSZip with no compression for maximum compatibility
-      console.log(`🗜️ Creating ZIP archive with JSZip...`);
-      const zipArrayBuffer = await zip.generateAsync({
-        type: "arraybuffer",
-        compression: "STORE",  // No compression for maximum compatibility
-        compressionOptions: {
-          level: 0
-        }
+      // Create ZIP with minimal compression
+      console.log(`🗜️ Generating ZIP file...`);
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "STORE", // No compression for reliability
       });
       
-      const zipData = new Uint8Array(zipArrayBuffer);
-      
-      console.log(`✅ ZIP created successfully: ${zipData.length} bytes`);
-      console.log(`📊 ZIP file details:`);
-      console.log(`  - Total size: ${zipData.length} bytes`);
-      console.log(`  - Compression: None (STORE)`);
-      console.log(`  - File count: ${Object.keys(zip.files).length}`);
-      
-      // Verify ZIP file signature
-      const signature = Array.from(zipData.slice(0, 4)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ');
-      console.log(`  - ZIP signature: [${signature}]`);
-      console.log(`  - Expected: [0x50, 0x4b, 0x03, 0x04]`);
-      
-      // Convert to blob with proper MIME type
-      const zipBlob = new Blob([zipData], { type: 'application/zip' });
-      
-      console.log(`📊 Final ZIP details:`);
-      console.log(`  Size: ${zipBlob.size} bytes (${(zipBlob.size / 1024 / 1024).toFixed(2)} MB)`);
-      console.log(`  Type: ${zipBlob.type}`);
-      console.log(`  Files: ${Object.keys(zip.files).length} files included`);
-      
-      // Validate ZIP file structure
-      console.log(`🔍 Validating ZIP file structure...`);
-      if (zipBlob.size < 100) {
-        throw new Error(`ZIP file is too small (${zipBlob.size} bytes). This indicates a problem with the archive creation.`);
-      }
-      
-      // Check if we have at least one image file
-      const imageFiles = Object.keys(zip.files).filter(name => 
-        name.match(/\.(jpg|jpeg|png|webp)$/i)
-      );
-      if (imageFiles.length === 0) {
-        throw new Error(`No image files found in ZIP archive. This indicates a problem with file processing.`);
-      }
-      
-      console.log(`✅ ZIP validation passed:`);
-      console.log(`  - Archive size: ${zipBlob.size} bytes`);
-      console.log(`  - Image files: ${imageFiles.length}`);
-      console.log(`  - Total files: ${Object.keys(zip.files).length}`);
+      console.log(`✅ ZIP created: ${zipBlob.size} bytes`);
       
       updateProgress({
-        uploadProgress: 75,
-        currentStep: 'Uploading files...',
+        uploadProgress: 60,
+        currentStep: 'Uploading to storage...',
       });
       
-      // Get upload URL from Convex
-      console.log(`🔗 Requesting upload URL from Convex...`);
+      // Step 2: Upload ZIP to Convex storage
+      console.log(`📤 Uploading ZIP to Convex storage...`);
       const uploadUrl = await generateUploadUrl();
-      console.log(`✅ Upload URL obtained: ${uploadUrl.substring(0, 50)}...`);
       
-      // Upload ZIP to Convex storage
-      console.log(`⬆️ Uploading ZIP to Convex storage...`);
-      const uploadResult = await fetch(uploadUrl, {
+      const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/zip",
-        },
+        headers: { "Content-Type": "application/zip" },
         body: zipBlob,
       });
 
-      console.log(`📡 Upload response status: ${uploadResult.status}`);
-
-      if (!uploadResult.ok) {
-        const errorText = await uploadResult.text();
-        console.error(`❌ Upload failed: ${uploadResult.statusText} - ${errorText}`);
-        throw new Error(`Upload failed: ${uploadResult.statusText}`);
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
       }
 
-      const uploadResponse = await uploadResult.json();
-      const { storageId } = uploadResponse;
-      
-      console.log(`✅ ZIP uploaded successfully!`);
-      console.log(`🆔 Storage ID: ${storageId}`);
+      const { storageId } = await uploadResponse.json();
+      console.log(`✅ ZIP uploaded successfully! Storage ID: ${storageId}`);
 
       updateProgress({
-        uploadProgress: 100,
+        uploadProgress: 80,
         isUploading: false,
         isTraining: true,
         trainingProgress: 0,
-        currentStep: 'Starting training...',
+        currentStep: 'Starting model training...',
       });
 
-      // Start training with the storage ID
-      console.log(`🎓 Initiating model training...`);
+      // Step 3: Start training
+      console.log(`🎓 Starting model training...`);
       const trainingResult = await trainModel({
         modelName: modelName.trim(),
         triggerWord: triggerWord.trim(),
@@ -337,15 +259,14 @@ function AuthenticatedApp() {
         currentStep: 'Training completed!',
       });
 
-      console.log(`🎉 Training completed successfully!`);
-      console.log(`📄 Training result:`, trainingResult);
-
-      toast.success(`Model "${modelName.trim()}" training completed! Check the weights dropdown.`);
+      console.log(`🎉 Training completed successfully!`, trainingResult);
+      toast.success(`Model "${modelName.trim()}" trained successfully! Check the weights dropdown.`);
       
       // Reset form
       setModelName("");
       setTriggerWord("");
       setSelectedImages([]);
+      setImageCaptions({});
       resetProgress();
       
       // Clear file input
@@ -357,7 +278,7 @@ function AuthenticatedApp() {
     } catch (error) {
       resetProgress();
       console.error(`❌ Training process failed:`, error);
-      toast.error(`Failed to train model: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Training failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsTraining(false);
       console.log(`🏁 Training process completed`);
@@ -378,6 +299,26 @@ function AuthenticatedApp() {
     } catch (error) {
       console.error(`❌ ZIP test error:`, error);
       toast.error(`ZIP test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleTestTraining = async () => {
+    try {
+      console.log(`🧪 Testing training API...`);
+      const result = await testTraining({
+        modelName: "test",
+        triggerWord: "test"
+      });
+      console.log(`📊 Training test result:`, result);
+      
+      if (result.success) {
+        toast.success(`Training API test passed: ${result.message}`);
+      } else {
+        toast.error(`Training API test failed: ${result.message}`);
+      }
+    } catch (error) {
+      console.error(`❌ Training test error:`, error);
+      toast.error(`Training test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -596,17 +537,17 @@ function AuthenticatedApp() {
           {/* Train button */}
           <button
             onClick={handleTrainModel}
-            disabled={isTraining || !modelName.trim() || !triggerWord.trim() || selectedImages.length < 5}
-            className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            disabled={isTraining || selectedImages.length < 5 || !modelName.trim() || !triggerWord.trim()}
+            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
-            {isTraining ? (
-              <>
-                <LoadingSpinner size="sm" className="mr-2" />
-                Training...
-              </>
-            ) : (
-              'Train Model'
-            )}
+            {isTraining ? 'Training Model...' : 'Train Model'}
+          </button>
+                    
+          <button
+            onClick={handleTestTraining}
+            className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700 transition-colors duration-200"
+          >
+            Test Training API
           </button>
         </div>
       )}
