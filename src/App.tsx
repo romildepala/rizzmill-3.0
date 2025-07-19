@@ -2,12 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Toaster, toast } from "sonner";
-import { Authenticated, Unauthenticated } from "convex/react";
-import { SignInForm } from "./SignInForm";
+import { useUser, SignIn, SignUp } from "@clerk/clerk-react";
 import { SignOutButton } from "./SignOutButton";
-import { ResetPasswordPage } from "./ResetPasswordPage";
-import { EmailVerificationPage } from "./EmailVerificationPage";
-import { EmailVerificationBanner } from "./EmailVerificationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProgressBar } from "./components/ProgressBar";
 import { LoadingSpinner } from "./components/LoadingSpinner";
@@ -54,7 +50,6 @@ function AuthenticatedApp() {
   const trainModel = useAction(api.training.trainModel);
   const generateUploadUrl = useMutation(api.generations.generateUploadUrl);
   const seedWeights = useMutation(api.modelWeights.seedWeights);
-  const user = useQuery(api.auth.loggedInUser);
   const testTraining = useAction(api.training.testTraining);
 
   // Set default weight when weights load
@@ -299,7 +294,7 @@ function AuthenticatedApp() {
   const handleTestZip = async (storageId: string) => {
     try {
       console.log(`🧪 Testing ZIP creation for storage ID: ${storageId}`);
-      const result = await testZipCreation({ storageId });
+      const result = await testTraining({ storageId });
       console.log(`📊 Test result:`, result);
       
       if (result.success) {
@@ -344,10 +339,6 @@ function AuthenticatedApp() {
         <h1 className="text-3xl font-bold text-gray-900">Rizzmil AI Image Generator</h1>
         <SignOutButton />
       </div>
-
-      {user && !user.emailVerificationTime && (
-        <EmailVerificationBanner userEmail={user.email} />
-      )}
 
       {/* Progress indicators */}
       <ProgressBar
@@ -577,7 +568,7 @@ function SignInPage() {
             Sign in to your account
           </h2>
         </div>
-        <SignInForm />
+        <SignIn />
       </div>
     </div>
   );

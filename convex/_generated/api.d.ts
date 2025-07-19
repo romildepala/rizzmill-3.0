@@ -13,7 +13,6 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as auth from "../auth.js";
 import type * as emailVerification from "../emailVerification.js";
 import type * as errors from "../errors.js";
 import type * as fileValidation from "../fileValidation.js";
@@ -36,7 +35,6 @@ import type * as utils from "../utils.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  auth: typeof auth;
   emailVerification: typeof emailVerification;
   errors: typeof errors;
   fileValidation: typeof fileValidation;
