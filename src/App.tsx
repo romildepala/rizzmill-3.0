@@ -22,6 +22,10 @@ function AuthenticatedApp() {
   const generateImage = useAction(api.generations.generateImage);
   const seedWeights = useMutation(api.modelWeights.seedWeights);
 
+  console.log("🔍 Debug - AuthenticatedApp rendered");
+  console.log("🔍 Debug - generations:", generations);
+  console.log("🔍 Debug - modelWeights:", modelWeights);
+
   // Set default weight when weights load
   useEffect(() => {
     if (modelWeights.length > 0 && !selectedWeight) {
@@ -32,6 +36,7 @@ function AuthenticatedApp() {
   // Seed weights on first load if none exist
   useEffect(() => {
     if (modelWeights.length === 0) {
+      console.log("🔍 Debug - Seeding weights...");
       seedWeights().catch(console.error);
     }
   }, [modelWeights.length, seedWeights]);
@@ -75,6 +80,9 @@ function AuthenticatedApp() {
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-green-800">
             ✅ Authentication is working properly!
+          </p>
+          <p className="text-sm text-green-700 mt-2">
+            Debug: {generations.length} generations, {modelWeights.length} weights loaded
           </p>
         </div>
 
@@ -181,6 +189,8 @@ function SignInPage() {
 
 export default function App() {
   const { isLoaded, isSignedIn } = useUser();
+  
+  console.log("🔍 Debug - App rendered, isLoaded:", isLoaded, "isSignedIn:", isSignedIn);
   
   if (!isLoaded) {
     return (
