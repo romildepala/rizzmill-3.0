@@ -16,9 +16,13 @@ interface ImageModalProps {
   onClose: () => void;
   imageUrl: string;
   prompt: string;
+  currentIndex: number;
+  totalImages: number;
+  onPrevious: () => void;
+  onNext: () => void;
 }
 
-function ImageModal({ isOpen, onClose, imageUrl, prompt }: ImageModalProps) {
+function ImageModal({ isOpen, onClose, imageUrl, prompt, currentIndex, totalImages, onPrevious, onNext }: ImageModalProps) {
   if (!isOpen) return null;
 
   const handleDownload = () => {
@@ -31,11 +35,60 @@ function ImageModal({ isOpen, onClose, imageUrl, prompt }: ImageModalProps) {
     toast.success("Image downloaded successfully!");
   };
 
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+    } else if (e.key === 'ArrowLeft') {
+      onPrevious();
+    } else if (e.key === 'ArrowRight') {
+      onNext();
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onPrevious, onNext, onClose]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden relative">
+        {/* Navigation buttons */}
+        {totalImages > 1 && (
+          <>
+            <button
+              onClick={onPrevious}
+              disabled={currentIndex === 0}
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={onNext}
+              disabled={currentIndex === totalImages - 1}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </>
+        )}
+
+        {/* Header */}
         <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">Generated Image</h3>
+          <div className="flex items-center space-x-4">
+            <h3 className="text-lg font-semibold text-gray-900">Generated Image</h3>
+            {totalImages > 1 && (
+              <span className="text-sm text-gray-500">
+                {currentIndex + 1} of {totalImages}
+              </span>
+            )}
+          </div>
           <div className="flex space-x-2">
             <button
               onClick={handleDownload}
@@ -51,6 +104,8 @@ function ImageModal({ isOpen, onClose, imageUrl, prompt }: ImageModalProps) {
             </button>
           </div>
         </div>
+
+        {/* Image */}
         <div className="p-4">
           <img 
             src={imageUrl} 
@@ -59,6 +114,13 @@ function ImageModal({ isOpen, onClose, imageUrl, prompt }: ImageModalProps) {
           />
           <p className="mt-4 text-sm text-gray-600">{prompt}</p>
         </div>
+
+        {/* Navigation instructions */}
+        {totalImages > 1 && (
+          <div className="px-4 pb-4 text-xs text-gray-500">
+            Use arrow keys or click the navigation buttons to browse images
+          </div>
+        )}
       </div>
     </div>
   );
@@ -81,6 +143,8 @@ function AuthenticatedApp() {
   // Image modal states
   const [selectedImage, setSelectedImage] = useState<{ url: string; prompt: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentModalImageIndex, setCurrentModalImageIndex] = useState(0);
+  const [totalModalImages, setTotalModalImages] = useState(0);
 
   const generations = useQuery(api.generations.list) || [];
   const modelWeights = useQuery(api.modelWeights.list) || [];
@@ -139,6 +203,8 @@ function AuthenticatedApp() {
   const handleImageClick = (imageUrl: string, prompt: string) => {
     setSelectedImage({ url: imageUrl, prompt });
     setIsModalOpen(true);
+    setCurrentModalImageIndex(generations.findIndex(gen => gen.imageUrl === imageUrl));
+    setTotalModalImages(generations.length);
   };
 
   const handleDownload = (imageUrl: string, prompt: string) => {
@@ -563,9 +629,28 @@ function AuthenticatedApp() {
           onClose={() => {
             setIsModalOpen(false);
             setSelectedImage(null);
+            setCurrentModalImageIndex(0);
           }}
-          imageUrl={selectedImage.url}
-          prompt={selectedImage.prompt}
+          imageUrl={generations[currentModalImageIndex]?.imageUrl || selectedImage.url}
+          prompt={generations[currentModalImageIndex]?.prompt || selectedImage.prompt}
+          currentIndex={currentModalImageIndex}
+          totalImages={totalModalImages}
+          onPrevious={() => {
+            const newIndex = Math.max(0, currentModalImageIndex - 1);
+            setCurrentModalImageIndex(newIndex);
+            setSelectedImage({
+              url: generations[newIndex].imageUrl,
+              prompt: generations[newIndex].prompt
+            });
+          }}
+          onNext={() => {
+            const newIndex = Math.min(totalModalImages - 1, currentModalImageIndex + 1);
+            setCurrentModalImageIndex(newIndex);
+            setSelectedImage({
+              url: generations[newIndex].imageUrl,
+              prompt: generations[newIndex].prompt
+            });
+          }}
         />
       )}
     </div>
