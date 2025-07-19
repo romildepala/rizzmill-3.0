@@ -20,6 +20,17 @@ const MODELS = [
 
 type ModelId = typeof MODELS[number]["id"];
 
+// URL routing helper
+function getUrlParams() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return {
+    verifyToken: urlParams.get('token'),
+    resetToken: urlParams.get('token'),
+    isVerifyEmail: window.location.pathname === '/verify-email',
+    isResetPassword: window.location.pathname === '/reset-password',
+  };
+}
+
 function AuthenticatedApp() {
   const [selectedModel, setSelectedModel] = useState<ModelId>(MODELS[0].id);
   const [selectedWeight, setSelectedWeight] = useState("");
@@ -334,7 +345,9 @@ function AuthenticatedApp() {
         <SignOutButton />
       </div>
 
-      <EmailVerificationBanner />
+      {user && !user.emailVerificationTime && (
+        <EmailVerificationBanner userEmail={user.email} />
+      )}
 
       {/* Progress indicators */}
       <ProgressBar
@@ -571,6 +584,38 @@ function SignInPage() {
 }
 
 export default function App() {
+  const urlParams = getUrlParams();
+  
+  // Handle email verification page
+  if (urlParams.isVerifyEmail && urlParams.verifyToken) {
+    return (
+      <ErrorBoundary>
+        <EmailVerificationPage 
+          token={urlParams.verifyToken} 
+          onSuccess={() => {
+            window.location.href = '/';
+          }} 
+        />
+        <Toaster />
+      </ErrorBoundary>
+    );
+  }
+  
+  // Handle password reset page
+  if (urlParams.isResetPassword && urlParams.resetToken) {
+    return (
+      <ErrorBoundary>
+        <ResetPasswordPage 
+          token={urlParams.resetToken} 
+          onSuccess={() => {
+            window.location.href = '/';
+          }} 
+        />
+        <Toaster />
+      </ErrorBoundary>
+    );
+  }
+  
   return (
     <ErrorBoundary>
       <Authenticated>
