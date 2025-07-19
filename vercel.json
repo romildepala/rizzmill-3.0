@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "npm install",
+  "env": {
+    "VITE_CONVEX_URL": "@convex-url",
+    "VITE_CLERK_PUBLISHABLE_KEY": "@clerk-publishable-key"
+  }
+} 
