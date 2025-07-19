@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { ClerkProvider } from "@clerk/clerk-react";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, ConvexProvider } from "convex/react";
 import "./index.css";
 import App from "./App";
 
@@ -13,6 +13,8 @@ if (!clerkPublishableKey) {
 
 createRoot(document.getElementById("root")!).render(
   <ClerkProvider publishableKey={clerkPublishableKey}>
-    <App />
+    <ConvexProvider client={convex}>
+      <App />
+    </ConvexProvider>
   </ClerkProvider>,
 );
