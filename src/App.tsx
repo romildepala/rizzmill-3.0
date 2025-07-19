@@ -40,11 +40,11 @@ function AuthenticatedApp() {
   const generations = useQuery(api.generations.list) || [];
   const modelWeights = useQuery(api.modelWeights.list) || [];
   const generateImage = useAction(api.generations.generateImage);
-  const trainModel = useAction(api.generations.trainModel);
+  const trainModel = useAction(api.training.trainModel);
   const generateUploadUrl = useMutation(api.generations.generateUploadUrl);
   const seedWeights = useMutation(api.modelWeights.seedWeights);
   const user = useQuery(api.auth.loggedInUser);
-  const testTraining = useAction(api.generations.testTraining);
+  const testTraining = useAction(api.training.testTraining);
 
   // Set default weight when weights load
   useEffect(() => {

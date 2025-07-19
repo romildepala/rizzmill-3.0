@@ -24,6 +24,7 @@ import type * as modelWeights from "../modelWeights.js";
 import type * as passwordReset from "../passwordReset.js";
 import type * as router from "../router.js";
 import type * as testTraining from "../testTraining.js";
+import type * as training from "../training.js";
 import type * as utils from "../utils.js";
 
 /**
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   passwordReset: typeof passwordReset;
   router: typeof router;
   testTraining: typeof testTraining;
+  training: typeof training;
   utils: typeof utils;
 }>;
 export declare const api: FilterApi<
