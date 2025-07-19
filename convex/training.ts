@@ -43,16 +43,14 @@ export const trainModel = action({
       console.log(`🔄 Preparing ZIP file for Fal AI upload...`);
       const zipArrayBuffer = await zipBlob.arrayBuffer();
       
-      // Create a proper File object for Fal AI client
-      const zipFile = new File([zipArrayBuffer], `training_${args.modelName}_${Date.now()}.zip`, {
-        type: 'application/zip'
-      });
+      // Create a Blob instead of File (File constructor not available in Convex Node.js runtime)
+      const zipFileBlob = new Blob([zipArrayBuffer], { type: 'application/zip' });
       
-      console.log(`📊 ZIP file prepared: ${zipFile.name} (${zipFile.size} bytes)`);
+      console.log(`📊 ZIP file prepared: ${zipFileBlob.size} bytes`);
 
       // Step 3: Upload ZIP to Fal AI storage using their official client
       console.log(`☁️ Uploading ZIP to Fal AI storage...`);
-      const falStorageUrl = await fal.storage.upload(zipFile);
+      const falStorageUrl = await fal.storage.upload(zipFileBlob);
       
       console.log(`✅ ZIP uploaded to Fal AI storage: ${falStorageUrl}`);
 
